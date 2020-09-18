@@ -779,6 +779,11 @@ impl Iterator for Bytes<'_> {
     }
 
     #[inline]
+    fn advance_by(&mut self, n: usize) -> usize {
+        self.0.advance_by(n)
+    }
+
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         self.0.nth(n)
     }
@@ -836,6 +841,11 @@ impl DoubleEndedIterator for Bytes<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<u8> {
         self.0.next_back()
+    }
+
+    #[inline]
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        self.0.advance_back_by(n)
     }
 
     #[inline]

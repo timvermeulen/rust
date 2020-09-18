@@ -284,6 +284,22 @@ pub trait Iterator {
         self.fold(None, some)
     }
 
+    /// needs docs
+    #[inline]
+    #[unstable(feature = "iter_advance_by", issue = "none")]
+    fn advance_by(&mut self, mut n: usize) -> usize {
+        if n == 0 {
+            return 0;
+        }
+        for _ in self {
+            n -= 1;
+            if n == 0 {
+                break;
+            }
+        }
+        n
+    }
+
     /// Returns the `n`th element of the iterator.
     ///
     /// Like most indexing operations, the count starts from zero, so `nth(0)`
@@ -325,14 +341,8 @@ pub trait Iterator {
     /// ```
     #[inline]
     #[stable(feature = "rust1", since = "1.0.0")]
-    fn nth(&mut self, mut n: usize) -> Option<Self::Item> {
-        while let Some(x) = self.next() {
-            if n == 0 {
-                return Some(x);
-            }
-            n -= 1;
-        }
-        None
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        if self.advance_by(n) == 0 { self.next() } else { None }
     }
 
     /// Creates an iterator starting at the same point, but stepping by

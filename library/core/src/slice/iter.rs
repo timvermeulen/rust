@@ -1155,16 +1155,10 @@ impl<'a, T> Iterator for Windows<'a, T> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let (end, overflow) = self.size.overflowing_add(n);
-        if end > self.v.len() || overflow {
-            self.v = &[];
-            None
-        } else {
-            let nth = &self.v[n..end];
-            self.v = &self.v[n + 1..];
-            Some(nth)
-        }
+    fn advance_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        self.v = &self.v[advance..];
+        n - advance
     }
 
     #[inline]
@@ -1201,16 +1195,10 @@ impl<'a, T> DoubleEndedIterator for Windows<'a, T> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        let (end, overflow) = self.v.len().overflowing_sub(n);
-        if end < self.size || overflow {
-            self.v = &[];
-            None
-        } else {
-            let ret = &self.v[end - self.size..end];
-            self.v = &self.v[..end - 1];
-            Some(ret)
-        }
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        self.v = &self.v[..self.v.len() - advance];
+        n - advance
     }
 }
 
@@ -1297,20 +1285,11 @@ impl<'a, T> Iterator for Chunks<'a, T> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let (start, overflow) = n.overflowing_mul(self.chunk_size);
-        if start >= self.v.len() || overflow {
-            self.v = &[];
-            None
-        } else {
-            let end = match start.checked_add(self.chunk_size) {
-                Some(sum) => cmp::min(self.v.len(), sum),
-                None => self.v.len(),
-            };
-            let nth = &self.v[start..end];
-            self.v = &self.v[end..];
-            Some(nth)
-        }
+    fn advance_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        let i = cmp::min(self.v.len(), advance.saturating_mul(self.chunk_size));
+        self.v = &self.v[i..];
+        n - advance
     }
 
     #[inline]
@@ -1357,21 +1336,13 @@ impl<'a, T> DoubleEndedIterator for Chunks<'a, T> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+    fn advance_back_by(&mut self, n: usize) -> usize {
         let len = self.len();
-        if n >= len {
-            self.v = &[];
-            None
-        } else {
-            let start = (len - 1 - n) * self.chunk_size;
-            let end = match start.checked_add(self.chunk_size) {
-                Some(res) => cmp::min(res, self.v.len()),
-                None => self.v.len(),
-            };
-            let nth_back = &self.v[start..end];
-            self.v = &self.v[..start];
-            Some(nth_back)
-        }
+        let advance = cmp::min(len, n);
+        let rem = len - advance;
+        let i = cmp::min(self.v.len(), rem.saturating_mul(self.chunk_size));
+        self.v = &self.v[..i];
+        n - advance
     }
 }
 
@@ -1451,22 +1422,12 @@ impl<'a, T> Iterator for ChunksMut<'a, T> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<&'a mut [T]> {
-        let (start, overflow) = n.overflowing_mul(self.chunk_size);
-        if start >= self.v.len() || overflow {
-            self.v = &mut [];
-            None
-        } else {
-            let end = match start.checked_add(self.chunk_size) {
-                Some(sum) => cmp::min(self.v.len(), sum),
-                None => self.v.len(),
-            };
-            let tmp = mem::replace(&mut self.v, &mut []);
-            let (head, tail) = tmp.split_at_mut(end);
-            let (_, nth) = head.split_at_mut(start);
-            self.v = tail;
-            Some(nth)
-        }
+    fn advance_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        let i = cmp::min(self.v.len(), advance.saturating_mul(self.chunk_size));
+        let (_, tail) = mem::take(&mut self.v).split_at_mut(i);
+        self.v = tail;
+        n - advance
     }
 
     #[inline]
@@ -1514,22 +1475,14 @@ impl<'a, T> DoubleEndedIterator for ChunksMut<'a, T> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+    fn advance_back_by(&mut self, n: usize) -> usize {
         let len = self.len();
-        if n >= len {
-            self.v = &mut [];
-            None
-        } else {
-            let start = (len - 1 - n) * self.chunk_size;
-            let end = match start.checked_add(self.chunk_size) {
-                Some(res) => cmp::min(res, self.v.len()),
-                None => self.v.len(),
-            };
-            let (temp, _tail) = mem::replace(&mut self.v, &mut []).split_at_mut(end);
-            let (head, nth_back) = temp.split_at_mut(start);
-            self.v = head;
-            Some(nth_back)
-        }
+        let advance = cmp::min(len, n);
+        let rem = len - advance;
+        let i = cmp::min(self.v.len(), rem.saturating_mul(self.chunk_size));
+        let (head, _) = mem::take(&mut self.v).split_at_mut(i);
+        self.v = head;
+        n - advance
     }
 }
 
@@ -1624,16 +1577,11 @@ impl<'a, T> Iterator for ChunksExact<'a, T> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let (start, overflow) = n.overflowing_mul(self.chunk_size);
-        if start >= self.v.len() || overflow {
-            self.v = &[];
-            None
-        } else {
-            let (_, snd) = self.v.split_at(start);
-            self.v = snd;
-            self.next()
-        }
+    fn advance_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        let i = advance * self.chunk_size;
+        self.v = &self.v[i..];
+        n - advance
     }
 
     #[inline]
@@ -1663,18 +1611,11 @@ impl<'a, T> DoubleEndedIterator for ChunksExact<'a, T> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        let len = self.len();
-        if n >= len {
-            self.v = &[];
-            None
-        } else {
-            let start = (len - 1 - n) * self.chunk_size;
-            let end = start + self.chunk_size;
-            let nth_back = &self.v[start..end];
-            self.v = &self.v[..start];
-            Some(nth_back)
-        }
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        let i = self.v.len() - advance * self.chunk_size;
+        self.v = &self.v[..i];
+        n - advance
     }
 }
 
@@ -1766,17 +1707,12 @@ impl<'a, T> Iterator for ChunksExactMut<'a, T> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<&'a mut [T]> {
-        let (start, overflow) = n.overflowing_mul(self.chunk_size);
-        if start >= self.v.len() || overflow {
-            self.v = &mut [];
-            None
-        } else {
-            let tmp = mem::replace(&mut self.v, &mut []);
-            let (_, snd) = tmp.split_at_mut(start);
-            self.v = snd;
-            self.next()
-        }
+    fn advance_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        let i = advance * self.chunk_size;
+        let (_, tail) = mem::take(&mut self.v).split_at_mut(i);
+        self.v = tail;
+        n - advance
     }
 
     #[inline]
@@ -1808,19 +1744,12 @@ impl<'a, T> DoubleEndedIterator for ChunksExactMut<'a, T> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        let len = self.len();
-        if n >= len {
-            self.v = &mut [];
-            None
-        } else {
-            let start = (len - 1 - n) * self.chunk_size;
-            let end = start + self.chunk_size;
-            let (temp, _tail) = mem::replace(&mut self.v, &mut []).split_at_mut(end);
-            let (head, nth_back) = temp.split_at_mut(start);
-            self.v = head;
-            Some(nth_back)
-        }
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        let i = self.v.len() - advance * self.chunk_size;
+        let (head, _) = mem::take(&mut self.v).split_at_mut(i);
+        self.v = head;
+        n - advance
     }
 }
 
@@ -2021,8 +1950,8 @@ impl<'a, T, const N: usize> Iterator for ArrayChunks<'a, T, N> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.iter.nth(n)
+    fn advance_by(&mut self, n: usize) -> usize {
+        self.iter.advance_by(n)
     }
 
     #[inline]
@@ -2045,8 +1974,8 @@ impl<'a, T, const N: usize> DoubleEndedIterator for ArrayChunks<'a, T, N> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        self.iter.nth_back(n)
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        self.iter.advance_back_by(n)
     }
 }
 
@@ -2132,8 +2061,8 @@ impl<'a, T, const N: usize> Iterator for ArrayChunksMut<'a, T, N> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.iter.nth(n)
+    fn advance_by(&mut self, n: usize) -> usize {
+        self.iter.advance_by(n)
     }
 
     #[inline]
@@ -2156,8 +2085,8 @@ impl<'a, T, const N: usize> DoubleEndedIterator for ArrayChunksMut<'a, T, N> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        self.iter.nth_back(n)
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        self.iter.advance_back_by(n)
     }
 }
 
@@ -2248,22 +2177,11 @@ impl<'a, T> Iterator for RChunks<'a, T> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let (end, overflow) = n.overflowing_mul(self.chunk_size);
-        if end >= self.v.len() || overflow {
-            self.v = &[];
-            None
-        } else {
-            // Can't underflow because of the check above
-            let end = self.v.len() - end;
-            let start = match end.checked_sub(self.chunk_size) {
-                Some(sum) => sum,
-                None => 0,
-            };
-            let nth = &self.v[start..end];
-            self.v = &self.v[0..start];
-            Some(nth)
-        }
+    fn advance_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        let i = self.v.len().saturating_sub(advance.saturating_mul(self.chunk_size));
+        self.v = &self.v[..i];
+        n - advance
     }
 
     #[inline]
@@ -2305,20 +2223,13 @@ impl<'a, T> DoubleEndedIterator for RChunks<'a, T> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+    fn advance_back_by(&mut self, n: usize) -> usize {
         let len = self.len();
-        if n >= len {
-            self.v = &[];
-            None
-        } else {
-            // can't underflow because `n < len`
-            let offset_from_end = (len - 1 - n) * self.chunk_size;
-            let end = self.v.len() - offset_from_end;
-            let start = end.saturating_sub(self.chunk_size);
-            let nth_back = &self.v[start..end];
-            self.v = &self.v[end..];
-            Some(nth_back)
-        }
+        let advance = cmp::min(len, n);
+        let rem = len - advance;
+        let i = self.v.len().saturating_sub(rem.saturating_mul(self.chunk_size));
+        self.v = &self.v[i..];
+        n - advance
     }
 }
 
@@ -2399,24 +2310,12 @@ impl<'a, T> Iterator for RChunksMut<'a, T> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<&'a mut [T]> {
-        let (end, overflow) = n.overflowing_mul(self.chunk_size);
-        if end >= self.v.len() || overflow {
-            self.v = &mut [];
-            None
-        } else {
-            // Can't underflow because of the check above
-            let end = self.v.len() - end;
-            let start = match end.checked_sub(self.chunk_size) {
-                Some(sum) => sum,
-                None => 0,
-            };
-            let tmp = mem::replace(&mut self.v, &mut []);
-            let (head, tail) = tmp.split_at_mut(start);
-            let (nth, _) = tail.split_at_mut(end - start);
-            self.v = head;
-            Some(nth)
-        }
+    fn advance_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        let i = self.v.len().saturating_sub(advance * self.chunk_size);
+        let (head, _) = mem::take(&mut self.v).split_at_mut(i);
+        self.v = head;
+        n - advance
     }
 
     #[inline]
@@ -2459,21 +2358,14 @@ impl<'a, T> DoubleEndedIterator for RChunksMut<'a, T> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+    fn advance_back_by(&mut self, n: usize) -> usize {
         let len = self.len();
-        if n >= len {
-            self.v = &mut [];
-            None
-        } else {
-            // can't underflow because `n < len`
-            let offset_from_end = (len - 1 - n) * self.chunk_size;
-            let end = self.v.len() - offset_from_end;
-            let start = end.saturating_sub(self.chunk_size);
-            let (tmp, tail) = mem::replace(&mut self.v, &mut []).split_at_mut(end);
-            let (_, nth_back) = tmp.split_at_mut(start);
-            self.v = tail;
-            Some(nth_back)
-        }
+        let advance = cmp::min(len, n);
+        let rem = len - advance;
+        let i = self.v.len().saturating_sub(rem.saturating_mul(self.chunk_size));
+        let (_, tail) = mem::take(&mut self.v).split_at_mut(i);
+        self.v = tail;
+        n - advance
     }
 }
 
@@ -2567,16 +2459,11 @@ impl<'a, T> Iterator for RChunksExact<'a, T> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let (end, overflow) = n.overflowing_mul(self.chunk_size);
-        if end >= self.v.len() || overflow {
-            self.v = &[];
-            None
-        } else {
-            let (fst, _) = self.v.split_at(self.v.len() - end);
-            self.v = fst;
-            self.next()
-        }
+    fn advance_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        let i = self.v.len() - advance * self.chunk_size;
+        self.v = &self.v[..i];
+        n - advance
     }
 
     #[inline]
@@ -2608,21 +2495,13 @@ impl<'a, T> DoubleEndedIterator for RChunksExact<'a, T> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+    fn advance_back_by(&mut self, n: usize) -> usize {
         let len = self.len();
-        if n >= len {
-            self.v = &[];
-            None
-        } else {
-            // now that we know that `n` corresponds to a chunk,
-            // none of these operations can underflow/overflow
-            let offset = (len - n) * self.chunk_size;
-            let start = self.v.len() - offset;
-            let end = start + self.chunk_size;
-            let nth_back = &self.v[start..end];
-            self.v = &self.v[end..];
-            Some(nth_back)
-        }
+        let advance = cmp::min(len, n);
+        let rem = len - advance;
+        let i = self.v.len() - rem * self.chunk_size;
+        self.v = &self.v[i..];
+        n - advance
     }
 }
 
@@ -2714,18 +2593,12 @@ impl<'a, T> Iterator for RChunksExactMut<'a, T> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<&'a mut [T]> {
-        let (end, overflow) = n.overflowing_mul(self.chunk_size);
-        if end >= self.v.len() || overflow {
-            self.v = &mut [];
-            None
-        } else {
-            let tmp = mem::replace(&mut self.v, &mut []);
-            let tmp_len = tmp.len();
-            let (fst, _) = tmp.split_at_mut(tmp_len - end);
-            self.v = fst;
-            self.next()
-        }
+    fn advance_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        let i = self.v.len() - advance * self.chunk_size;
+        let (head, _) = mem::take(&mut self.v).split_at_mut(i);
+        self.v = head;
+        n - advance
     }
 
     #[inline]
@@ -2757,22 +2630,14 @@ impl<'a, T> DoubleEndedIterator for RChunksExactMut<'a, T> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+    fn advance_back_by(&mut self, n: usize) -> usize {
         let len = self.len();
-        if n >= len {
-            self.v = &mut [];
-            None
-        } else {
-            // now that we know that `n` corresponds to a chunk,
-            // none of these operations can underflow/overflow
-            let offset = (len - n) * self.chunk_size;
-            let start = self.v.len() - offset;
-            let end = start + self.chunk_size;
-            let (tmp, tail) = mem::replace(&mut self.v, &mut []).split_at_mut(end);
-            let (_, nth_back) = tmp.split_at_mut(start);
-            self.v = tail;
-            Some(nth_back)
-        }
+        let advance = cmp::min(len, n);
+        let rem = len - advance;
+        let i = self.v.len() - rem * self.chunk_size;
+        let (_, tail) = mem::take(&mut self.v).split_at_mut(i);
+        self.v = tail;
+        n - advance
     }
 }
 

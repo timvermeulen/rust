@@ -101,6 +101,7 @@
 #![feature(fn_traits)]
 #![feature(fundamental)]
 #![feature(inplace_iteration)]
+#![feature(iter_advance_by)]
 #![feature(lang_items)]
 #![feature(layout_for_ptr)]
 #![feature(libc)]

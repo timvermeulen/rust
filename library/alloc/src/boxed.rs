@@ -978,6 +978,9 @@ impl<I: Iterator + ?Sized> Iterator for Box<I> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         (**self).size_hint()
     }
+    fn advance_by(&mut self, n: usize) -> usize {
+        (**self).advance_by(n)
+    }
     fn nth(&mut self, n: usize) -> Option<I::Item> {
         (**self).nth(n)
     }
@@ -1016,6 +1019,9 @@ impl<I: Iterator> BoxIter for Box<I> {
 impl<I: DoubleEndedIterator + ?Sized> DoubleEndedIterator for Box<I> {
     fn next_back(&mut self) -> Option<I::Item> {
         (**self).next_back()
+    }
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        (**self).advance_back_by(n)
     }
     fn nth_back(&mut self, n: usize) -> Option<I::Item> {
         (**self).nth_back(n)

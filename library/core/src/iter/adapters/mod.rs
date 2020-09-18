@@ -125,6 +125,11 @@ where
     }
 
     #[inline]
+    fn advance_by(&mut self, n: usize) -> usize {
+        self.iter.advance_back_by(n)
+    }
+
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<<I as Iterator>::Item> {
         self.iter.nth_back(n)
     }
@@ -162,6 +167,11 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<<I as Iterator>::Item> {
         self.iter.next()
+    }
+
+    #[inline]
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        self.iter.advance_by(n)
     }
 
     #[inline]
@@ -273,6 +283,10 @@ where
         self.it.fold(init, copy_fold(f))
     }
 
+    fn advance_by(&mut self, n: usize) -> usize {
+        self.it.advance_by(n)
+    }
+
     fn nth(&mut self, n: usize) -> Option<T> {
         self.it.nth(n).copied()
     }
@@ -319,6 +333,10 @@ where
         F: FnMut(Acc, Self::Item) -> Acc,
     {
         self.it.rfold(init, copy_fold(f))
+    }
+
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        self.it.advance_back_by(n)
     }
 }
 
@@ -549,6 +567,28 @@ where
     }
 
     #[inline]
+    fn advance_by(&mut self, mut n: usize) -> usize {
+        n = match self.iter.advance_by(n) {
+            0 => return 0,
+            n => n,
+        };
+        self.iter = self.orig.clone();
+
+        match self.iter.advance_by(n) {
+            0 => return 0,
+            k if k == n => return n,
+            k => n = k,
+        };
+
+        while n > 0 {
+            self.iter = self.orig.clone();
+            n = self.iter.advance_by(n);
+        }
+
+        0
+    }
+
+    #[inline]
     fn try_fold<Acc, F, R>(&mut self, mut acc: Acc, mut f: F) -> R
     where
         F: FnMut(Acc, Self::Item) -> R,
@@ -648,6 +688,50 @@ where
     }
 
     #[inline]
+    fn advance_by(&mut self, mut n: usize) -> usize {
+        if n == 0 {
+            return 0;
+        }
+
+        if self.first_take {
+            self.first_take = false;
+            if self.iter.next().is_none() {
+                return n;
+            }
+            n -= 1;
+
+            if n == 0 {
+                return 0;
+            }
+        }
+
+        let step = self.step + 1;
+
+        fn div_rounding_up(a: usize, b: usize) -> usize {
+            a / b + (a % b > 0) as usize
+        }
+
+        loop {
+            let product = n.checked_mul(step);
+
+            if intrinsics::likely(product.is_some()) {
+                let k = self.iter.advance_by(product.unwrap());
+                return div_rounding_up(k, step);
+            }
+
+            let div_step = usize::MAX / step;
+            let advance = div_step * step;
+            n -= div_step;
+
+            let k = self.iter.advance_by(advance);
+
+            if k > 0 {
+                return n + div_rounding_up(k, step);
+            }
+        }
+    }
+
+    #[inline]
     fn nth(&mut self, mut n: usize) -> Option<Self::Item> {
         if self.first_take {
             self.first_take = false;
@@ -688,7 +772,7 @@ where
                 n -= div_step;
                 nth_step
             };
-            self.iter.nth(nth - 1);
+            self.iter.nth(nth - 1); // FIXME: this is missing a `?`
         }
     }
 
@@ -736,8 +820,8 @@ impl<I> StepBy<I>
 where
     I: ExactSizeIterator,
 {
-    // The zero-based index starting from the end of the iterator of the
-    // last element. Used in the `DoubleEndedIterator` implementation.
+    /// The zero-based index starting from the end of the iterator of the
+    /// last element. Used in the `DoubleEndedIterator` implementation.
     fn next_back_index(&self) -> usize {
         let rem = self.iter.len() % (self.step + 1);
         if self.first_take {
@@ -756,6 +840,17 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         self.iter.nth_back(self.next_back_index())
+    }
+
+    #[inline]
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        if n == 0 {
+            return 0;
+        }
+
+        let len = self.len();
+        self.nth_back(n - 1);
+        n.saturating_sub(len)
     }
 
     #[inline]
@@ -1374,6 +1469,18 @@ where
     }
 
     #[inline]
+    fn advance_by(&mut self, n: usize) -> usize {
+        match self.iter.advance_by(n) {
+            0 => {
+                // Possible undefined overflow.
+                self.count = Add::add(self.count, n);
+                0
+            }
+            n => n,
+        }
+    }
+
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<(usize, I::Item)> {
         let a = self.iter.nth(n)?;
         // Possible undefined overflow.
@@ -1454,6 +1561,11 @@ where
         // Can safely add, `ExactSizeIterator` promises that the number of
         // elements fits into a `usize`.
         Some((self.count + len, a))
+    }
+
+    #[inline]
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        self.iter.advance_back_by(n)
     }
 
     #[inline]
@@ -1607,6 +1719,21 @@ impl<I: Iterator> Iterator for Peekable<I> {
     }
 
     #[inline]
+    fn advance_by(&mut self, n: usize) -> usize {
+        if n == 0 {
+            return 0;
+        }
+
+        let n = match self.peeked.take() {
+            Some(None) => return n,
+            Some(Some(_)) => n - 1,
+            None => n,
+        };
+
+        self.iter.advance_by(n)
+    }
+
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<I::Item> {
         match self.peeked.take() {
             Some(None) => None,
@@ -1682,6 +1809,18 @@ where
             Some(v @ Some(_)) => self.iter.next_back().or_else(|| v.take()),
             Some(None) => None,
             None => self.iter.next_back(),
+        }
+    }
+
+    #[inline]
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        if let Some(None) = self.peeked {
+            return n;
+        }
+
+        match self.iter.advance_back_by(n) {
+            0 => 0,
+            n => n - self.peeked.take().is_some() as usize,
         }
     }
 
@@ -2250,6 +2389,11 @@ where
     }
 
     #[inline]
+    fn advance_by(&mut self, n: usize) -> usize {
+        if self.iter.advance_by(self.n) == 0 { self.iter.advance_by(n) } else { n }
+    }
+
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<I::Item> {
         // Can't just add n + self.n due to overflow.
         if self.n > 0 {
@@ -2337,6 +2481,13 @@ where
 {
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.len() > 0 { self.iter.next_back() } else { None }
+    }
+
+    #[inline]
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        let advance = cmp::min(self.len(), n);
+        self.iter.advance_back_by(advance);
+        n - advance
     }
 
     #[inline]
@@ -2449,6 +2600,18 @@ where
     }
 
     #[inline]
+    fn advance_by(&mut self, n: usize) -> usize {
+        if self.n > n {
+            self.n -= n;
+            self.iter.advance_by(n)
+        } else {
+            let take_n = self.n;
+            self.n = 0;
+            n - take_n + self.iter.advance_by(take_n)
+        }
+    }
+
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<I::Item> {
         if self.n > n {
             self.n -= n + 1;
@@ -2552,6 +2715,16 @@ where
             self.n -= 1;
             self.iter.nth_back(self.iter.len().saturating_sub(n))
         }
+    }
+
+    #[inline]
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        let iter_len = self.iter.len();
+        let len = cmp::min(iter_len, self.n);
+        let excess = iter_len - len;
+        let advance = cmp::min(len, n);
+        self.iter.advance_back_by(advance + excess);
+        n - advance
     }
 
     #[inline]

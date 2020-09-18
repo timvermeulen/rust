@@ -69,6 +69,11 @@ where
     }
 
     #[inline]
+    fn advance_by(&mut self, n: usize) -> usize {
+        FuseImpl::advance_by(self, n)
+    }
+
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<I::Item> {
         FuseImpl::nth(self, n)
     }
@@ -139,6 +144,11 @@ where
     }
 
     #[inline]
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        FuseImpl::advance_back_by(self, n)
+    }
+
+    #[inline]
     fn nth_back(&mut self, n: usize) -> Option<<I as Iterator>::Item> {
         FuseImpl::nth_back(self, n)
     }
@@ -202,6 +212,7 @@ trait FuseImpl<I> {
 
     // Functions specific to any normal Iterators
     fn next(&mut self) -> Option<Self::Item>;
+    fn advance_by(&mut self, n: usize) -> usize;
     fn nth(&mut self, n: usize) -> Option<Self::Item>;
     fn last(self) -> Option<Self::Item>;
     fn count(self) -> usize;
@@ -220,6 +231,9 @@ trait FuseImpl<I> {
 
     // Functions specific to DoubleEndedIterators
     fn next_back(&mut self) -> Option<Self::Item>
+    where
+        I: DoubleEndedIterator;
+    fn advance_back_by(&mut self, n: usize) -> usize
     where
         I: DoubleEndedIterator;
     fn nth_back(&mut self, n: usize) -> Option<Self::Item>
@@ -260,6 +274,20 @@ where
     #[inline]
     default fn next(&mut self) -> Option<<I as Iterator>::Item> {
         fuse!(self.iter.next())
+    }
+
+    #[inline]
+    default fn advance_by(&mut self, n: usize) -> usize {
+        match self.iter {
+            Some(ref mut iter) => {
+                let k = iter.advance_by(n);
+                if k > 0 {
+                    self.iter = None;
+                }
+                k
+            }
+            None => n,
+        }
     }
 
     #[inline]
@@ -330,6 +358,23 @@ where
         I: DoubleEndedIterator,
     {
         fuse!(self.iter.next_back())
+    }
+
+    #[inline]
+    default fn advance_back_by(&mut self, n: usize) -> usize
+    where
+        I: DoubleEndedIterator,
+    {
+        match self.iter {
+            Some(ref mut iter) => {
+                let k = iter.advance_back_by(n);
+                if k > 0 {
+                    self.iter = None;
+                }
+                k
+            }
+            None => n,
+        }
     }
 
     #[inline]
@@ -410,6 +455,11 @@ where
     }
 
     #[inline]
+    fn advance_by(&mut self, n: usize) -> usize {
+        unchecked!(self).advance_by(n)
+    }
+
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<I::Item> {
         unchecked!(self).nth(n)
     }
@@ -461,6 +511,14 @@ where
         I: DoubleEndedIterator,
     {
         unchecked!(self).next_back()
+    }
+
+    #[inline]
+    fn advance_back_by(&mut self, n: usize) -> usize
+    where
+        I: DoubleEndedIterator,
+    {
+        unchecked!(self).advance_back_by(n)
     }
 
     #[inline]

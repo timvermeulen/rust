@@ -2574,13 +2574,14 @@ impl<'a, T> Iterator for Iter<'a, T> {
         final_res
     }
 
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= count(self.tail, self.head, self.ring.len()) {
+    fn advance_by(&mut self, n: usize) -> usize {
+        let len = self.len();
+        if n >= len {
             self.tail = self.head;
-            None
+            n - len
         } else {
             self.tail = wrap_index(self.tail.wrapping_add(n), self.ring.len());
-            self.next()
+            0
         }
     }
 
@@ -2700,13 +2701,14 @@ impl<'a, T> Iterator for IterMut<'a, T> {
         back.iter_mut().fold(accum, &mut f)
     }
 
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= count(self.tail, self.head, self.ring.len()) {
+    fn advance_by(&mut self, n: usize) -> usize {
+        let len = self.len();
+        if n >= len {
             self.tail = self.head;
-            None
+            n - len
         } else {
             self.tail = wrap_index(self.tail.wrapping_add(n), self.ring.len());
-            self.next()
+            0
         }
     }
 

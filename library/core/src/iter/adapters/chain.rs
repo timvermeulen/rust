@@ -115,16 +115,37 @@ where
     }
 
     #[inline]
-    fn nth(&mut self, mut n: usize) -> Option<A::Item> {
-        if let Some(ref mut a) = self.a {
-            while let Some(x) = a.next() {
-                if n == 0 {
-                    return Some(x);
-                }
-                n -= 1;
-            }
+    fn advance_by(&mut self, n: usize) -> usize {
+        let n = match &mut self.a {
+            Some(a) => a.advance_by(n),
+            None => n,
+        };
+
+        if n == 0 {
+            return 0;
+        } else {
             self.a = None;
         }
+
+        match &mut self.b {
+            Some(b) => b.advance_by(n),
+            None => n,
+        }
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<A::Item> {
+        let n = match &mut self.a {
+            Some(a) => a.advance_by(n),
+            None => n,
+        };
+
+        if n == 0 {
+            return None;
+        } else {
+            self.a = None;
+        }
+
         maybe!(self.b.nth(n))
     }
 
@@ -187,6 +208,23 @@ where
         match fuse!(self.b.next_back()) {
             None => maybe!(self.a.next_back()),
             item => item,
+        }
+    }
+
+    #[inline]
+    fn advance_back_by(&mut self, n: usize) -> usize {
+        let n = match &mut self.b {
+            Some(b) => b.advance_back_by(n),
+            None => n,
+        };
+
+        if n > 0 {
+            self.b = None;
+        }
+
+        match &mut self.a {
+            Some(a) => a.advance_by(n),
+            None => n,
         }
     }
 

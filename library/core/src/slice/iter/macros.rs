@@ -163,6 +163,14 @@ macro_rules! iterator {
             }
 
             #[inline]
+            fn advance_by(&mut self, n: usize) -> usize {
+                let advance = cmp::min(n, len!(self));
+                // SAFETY: `advance` does not exceed `self.len()`
+                unsafe { self.post_inc_start(advance as isize) };
+                n - advance
+            }
+
+            #[inline]
             fn nth(&mut self, n: usize) -> Option<$elem> {
                 if n >= len!(self) {
                     // This iterator is now empty.
@@ -356,6 +364,14 @@ macro_rules! iterator {
                         Some(next_back_unchecked!(self))
                     }
                 }
+            }
+
+            #[inline]
+            fn advance_back_by(&mut self, n: usize) -> usize {
+                let advance = cmp::min(n, len!(self));
+                // SAFETY: `advance` does not exceed `self.len()`
+                unsafe { self.pre_dec_end(advance as isize) };
+                n - advance
             }
 
             #[inline]

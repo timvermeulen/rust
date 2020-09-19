@@ -94,9 +94,9 @@ pub trait DoubleEndedIterator: Iterator {
     /// needs docs
     #[inline]
     #[unstable(feature = "iter_advance_by", issue = "none")]
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         if n == 0 {
-            return 0;
+            return Ok(());
         }
 
         let mut k = 0;
@@ -104,11 +104,11 @@ pub trait DoubleEndedIterator: Iterator {
         for _ in self.rev() {
             k += 1;
             if k == n {
-                break;
+                return Ok(());
             }
         }
 
-        k
+        Err(k)
     }
 
     /// Returns the `n`th element from the end of the iterator.
@@ -156,7 +156,7 @@ pub trait DoubleEndedIterator: Iterator {
     #[inline]
     #[stable(feature = "iter_nth_back", since = "1.37.0")]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        if self.advance_back_by(n) == n { self.next_back() } else { None }
+        if self.advance_back_by(n).is_ok() { self.next_back() } else { None }
     }
 
     /// This is the reverse version of [`try_fold()`]: it takes elements
@@ -337,7 +337,7 @@ impl<'a, I: DoubleEndedIterator + ?Sized> DoubleEndedIterator for &'a mut I {
     fn next_back(&mut self) -> Option<I::Item> {
         (**self).next_back()
     }
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         (**self).advance_back_by(n)
     }
     fn nth_back(&mut self, n: usize) -> Option<I::Item> {

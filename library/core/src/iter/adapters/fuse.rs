@@ -69,7 +69,7 @@ where
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         FuseImpl::advance_by(self, n)
     }
 
@@ -144,7 +144,7 @@ where
     }
 
     #[inline]
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         FuseImpl::advance_back_by(self, n)
     }
 
@@ -212,7 +212,7 @@ trait FuseImpl<I> {
 
     // Functions specific to any normal Iterators
     fn next(&mut self) -> Option<Self::Item>;
-    fn advance_by(&mut self, n: usize) -> usize;
+    fn advance_by(&mut self, n: usize) -> Result<(), usize>;
     fn nth(&mut self, n: usize) -> Option<Self::Item>;
     fn last(self) -> Option<Self::Item>;
     fn count(self) -> usize;
@@ -233,7 +233,7 @@ trait FuseImpl<I> {
     fn next_back(&mut self) -> Option<Self::Item>
     where
         I: DoubleEndedIterator;
-    fn advance_back_by(&mut self, n: usize) -> usize
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize>
     where
         I: DoubleEndedIterator;
     fn nth_back(&mut self, n: usize) -> Option<Self::Item>
@@ -277,16 +277,16 @@ where
     }
 
     #[inline]
-    default fn advance_by(&mut self, n: usize) -> usize {
+    default fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         match self.iter {
-            Some(ref mut iter) => {
-                let k = iter.advance_by(n);
-                if k < n {
+            Some(ref mut iter) => match iter.advance_by(n) {
+                Ok(()) => Ok(()),
+                Err(k) => {
                     self.iter = None;
+                    Err(k)
                 }
-                k
-            }
-            None => n,
+            },
+            None => Ok(()),
         }
     }
 
@@ -361,19 +361,19 @@ where
     }
 
     #[inline]
-    default fn advance_back_by(&mut self, n: usize) -> usize
+    default fn advance_back_by(&mut self, n: usize) -> Result<(), usize>
     where
         I: DoubleEndedIterator,
     {
         match self.iter {
-            Some(ref mut iter) => {
-                let k = iter.advance_back_by(n);
-                if k < n {
+            Some(ref mut iter) => match iter.advance_back_by(n) {
+                Ok(()) => Ok(()),
+                Err(k) => {
                     self.iter = None;
+                    Err(k)
                 }
-                k
-            }
-            None => n,
+            },
+            None => Ok(()),
         }
     }
 
@@ -455,7 +455,7 @@ where
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         unchecked!(self).advance_by(n)
     }
 
@@ -514,7 +514,7 @@ where
     }
 
     #[inline]
-    fn advance_back_by(&mut self, n: usize) -> usize
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize>
     where
         I: DoubleEndedIterator,
     {

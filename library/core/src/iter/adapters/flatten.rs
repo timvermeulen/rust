@@ -369,15 +369,17 @@ where
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         fn advance<I: Iterator>(n: usize, iter: &mut I) -> Option<usize> {
-            let rem = n - iter.advance_by(n);
-            if rem == 0 { None } else { Some(rem) }
+            match iter.advance_by(n) {
+                Ok(()) => None,
+                Err(k) => Some(n - k),
+            }
         }
 
         match self.iter_try_fold(n, advance) {
-            Some(rem) => n - rem,
-            None => n,
+            Some(rem) => Err(n - rem),
+            None => Ok(()),
         }
     }
 
@@ -440,15 +442,17 @@ where
     }
 
     #[inline]
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         fn advance<I: DoubleEndedIterator>(n: usize, iter: &mut I) -> Option<usize> {
-            let rem = n - iter.advance_back_by(n);
-            if rem == 0 { None } else { Some(rem) }
+            match iter.advance_back_by(n) {
+                Ok(()) => None,
+                Err(k) => Some(n - k),
+            }
         }
 
         match self.iter_try_rfold(n, advance) {
-            Some(rem) => n - rem,
-            None => n,
+            Some(rem) => Err(n - rem),
+            None => Ok(()),
         }
     }
 

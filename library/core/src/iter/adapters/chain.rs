@@ -115,24 +115,25 @@ where
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let mut rem = n;
 
         if let Some(ref mut a) = self.a {
-            rem -= a.advance_by(rem);
-        }
-
-        if rem == 0 {
-            return n;
-        } else {
+            match a.advance_by(rem) {
+                Ok(()) => return Ok(()),
+                Err(k) => rem -= k,
+            }
             self.a = None;
         }
 
         if let Some(ref mut b) = self.b {
-            rem -= b.advance_by(rem);
+            match b.advance_by(rem) {
+                Ok(()) => return Ok(()),
+                Err(k) => rem -= k,
+            }
         }
 
-        n - rem
+        Err(n - rem)
     }
 
     #[inline]
@@ -198,24 +199,25 @@ where
     }
 
     #[inline]
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         let mut rem = n;
 
         if let Some(ref mut b) = self.b {
-            rem -= b.advance_back_by(rem);
-        }
-
-        if rem == 0 {
-            return n;
-        } else {
+            match b.advance_back_by(rem) {
+                Ok(()) => return Ok(()),
+                Err(k) => rem -= k,
+            }
             self.b = None;
         }
 
         if let Some(ref mut a) = self.a {
-            rem -= a.advance_back_by(rem);
+            match a.advance_back_by(rem) {
+                Ok(()) => return Ok(()),
+                Err(k) => rem -= k,
+            }
         }
 
-        n - rem
+        Err(n - rem)
     }
 
     #[inline]

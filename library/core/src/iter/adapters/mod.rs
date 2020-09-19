@@ -125,7 +125,7 @@ where
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         self.iter.advance_back_by(n)
     }
 
@@ -170,7 +170,7 @@ where
     }
 
     #[inline]
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         self.iter.advance_by(n)
     }
 
@@ -283,7 +283,7 @@ where
         self.it.fold(init, copy_fold(f))
     }
 
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         self.it.advance_by(n)
     }
 
@@ -335,7 +335,7 @@ where
         self.it.rfold(init, copy_fold(f))
     }
 
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         self.it.advance_back_by(n)
     }
 }
@@ -567,31 +567,30 @@ where
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let mut rem = n;
-        rem -= self.iter.advance_by(rem);
 
-        if rem == 0 {
-            return n;
+        match self.iter.advance_by(rem) {
+            Ok(()) => return Ok(()),
+            Err(k) => rem -= k,
         }
 
         self.iter = self.orig.clone();
 
         match self.iter.advance_by(rem) {
-            0 => return 0, // the cycled iterator is empty
-            k => rem -= k,
+            Ok(()) => return Ok(()),
+            Err(0) => return Err(0), // the cycled iterator is empty
+            Err(k) => rem -= k,
         }
 
-        if rem == 0 {
-            return n;
-        }
-
-        while rem > 0 {
+        loop {
             self.iter = self.orig.clone();
-            rem -= self.iter.advance_by(rem);
-        }
 
-        0
+            match self.iter.advance_by(rem) {
+                Ok(()) => return Ok(()),
+                Err(k) => rem -= k,
+            }
+        }
     }
 
     #[inline]
@@ -694,9 +693,9 @@ where
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         if n == 0 {
-            return 0;
+            return Ok(());
         }
 
         let mut rem = n;
@@ -705,12 +704,12 @@ where
             self.first_take = false;
 
             if self.iter.next().is_none() {
-                return 0;
+                return Err(0);
             }
 
             rem -= 1;
             if rem == 0 {
-                return n;
+                return Ok(());
             }
         }
 
@@ -719,19 +718,26 @@ where
         loop {
             let product = rem.checked_mul(step);
 
-            if intrinsics::likely(product.is_some()) {
-                let advance = self.iter.advance_by(product.unwrap()) / step;
-                rem -= advance;
-                return n - rem;
-            }
+            let iter_advance = if intrinsics::likely(product.is_some()) {
+                match self.iter.advance_by(product.unwrap()) {
+                    Ok(()) => return Ok(()),
+                    Err(k) => k,
+                }
+            } else {
+                let number_of_steps = usize::MAX / step;
 
-            let number_of_steps = usize::MAX / step;
-            let advance = self.iter.advance_by(number_of_steps * step) / step;
+                match self.iter.advance_by(number_of_steps * step) {
+                    Ok(()) => {
+                        rem -= number_of_steps;
+                        continue;
+                    }
+                    Err(k) => k,
+                }
+            };
+
+            let advance = iter_advance / step;
             rem -= advance;
-
-            if advance < number_of_steps {
-                return n - rem;
-            }
+            return Err(n - rem);
         }
     }
 
@@ -847,14 +853,14 @@ where
     }
 
     #[inline]
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         if n == 0 {
-            return 0;
+            return Ok(());
         }
 
         let len = self.len();
         self.nth_back(n - 1);
-        cmp::min(n, len)
+        if len < n { Err(len) } else { Ok(()) }
     }
 
     #[inline]
@@ -1473,13 +1479,12 @@ where
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
-        let advance = self.iter.advance_by(n);
-        if advance == n {
-            // Possible undefined overflow.
-            self.count = Add::add(self.count, n);
-        }
-        advance
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        self.iter.advance_by(n)?;
+
+        // Possible undefined overflow.
+        self.count = Add::add(self.count, n);
+        Ok(())
     }
 
     #[inline]
@@ -1566,7 +1571,7 @@ where
     }
 
     #[inline]
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         self.iter.advance_back_by(n)
     }
 
@@ -1721,18 +1726,21 @@ impl<I: Iterator> Iterator for Peekable<I> {
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         if n == 0 {
-            return 0;
+            return Ok(());
         }
 
         let peeked = match self.peeked.take() {
-            Some(None) => return 0,
+            Some(None) => return Err(0),
             Some(Some(_)) => 1,
             None => 0,
         };
 
-        self.iter.advance_by(n - peeked) + peeked
+        match self.iter.advance_by(n - peeked) {
+            Ok(()) => Ok(()),
+            Err(k) => Err(k + peeked),
+        }
     }
 
     #[inline]
@@ -1815,16 +1823,23 @@ where
     }
 
     #[inline]
-    fn advance_back_by(&mut self, n: usize) -> usize {
-        if let Some(None) = self.peeked {
-            return 0;
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
+        if n == 0 {
+            return Ok(());
+        } else if let Some(None) = self.peeked {
+            return Err(0);
         }
 
-        let mut advance = self.iter.advance_back_by(n);
-        if advance < n && self.peeked.take().is_some() {
-            advance += 1;
+        match self.iter.advance_back_by(n) {
+            Ok(()) => Ok(()),
+            Err(k) => match self.peeked.take() {
+                Some(_) => {
+                    let advance = k + 1;
+                    if advance == n { Ok(()) } else { Err(advance) }
+                }
+                None => Err(k),
+            },
         }
-        advance
     }
 
     #[inline]
@@ -2392,8 +2407,15 @@ where
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
-        if self.iter.advance_by(self.n) == self.n { self.iter.advance_by(n) } else { 0 }
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        if n == 0 {
+            return Ok(());
+        }
+
+        match self.iter.advance_by(self.n) {
+            Ok(()) => self.iter.advance_by(n),
+            Err(_) => Err(0),
+        }
     }
 
     #[inline]
@@ -2487,10 +2509,10 @@ where
     }
 
     #[inline]
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         let advance = cmp::min(self.len(), n);
-        self.iter.advance_back_by(advance);
-        advance
+        let _ = self.iter.advance_back_by(advance);
+        if advance == n { Ok(()) } else { Err(advance) }
     }
 
     #[inline]
@@ -2603,10 +2625,15 @@ where
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let advance = cmp::min(self.n, n);
         self.n -= advance;
-        self.iter.advance_by(advance)
+
+        match self.iter.advance_by(advance) {
+            Ok(()) if advance == n => Ok(()),
+            Ok(()) => Err(advance),
+            Err(k) => Err(advance + k),
+        }
     }
 
     #[inline]
@@ -2716,13 +2743,13 @@ where
     }
 
     #[inline]
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         let iter_len = self.iter.len();
         let len = cmp::min(iter_len, self.n);
         let excess = iter_len - len;
         let advance = cmp::min(len, n);
-        self.iter.advance_back_by(advance + excess);
-        advance
+        let _ = self.iter.advance_back_by(advance + excess);
+        if advance == n { Ok(()) } else { Err(advance) }
     }
 
     #[inline]

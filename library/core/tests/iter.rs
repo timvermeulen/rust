@@ -467,9 +467,9 @@ fn test_iterator_step_by_nth_overflow() {
         fn next(&mut self) -> Option<Self::Item> {
             Some(21)
         }
-        fn advance_by(&mut self, n: usize) -> usize {
+        fn advance_by(&mut self, n: usize) -> Result<(), usize> {
             self.0 += n as Bigger;
-            n
+            Ok(())
         }
         fn nth(&mut self, n: usize) -> Option<Self::Item> {
             self.0 += n as Bigger + 1;

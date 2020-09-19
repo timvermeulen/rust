@@ -522,17 +522,17 @@ impl<A: Step> Iterator for ops::Range<A> {
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         if let Some(plus_n) = Step::forward_checked(self.start.clone(), n) {
             if plus_n <= self.end {
                 self.start = plus_n;
-                return n;
+                return Ok(());
             }
         }
 
         let len = Step::steps_between(&self.start, &self.end).unwrap();
         self.start = self.end.clone();
-        len
+        Err(len)
     }
 
     #[inline]
@@ -596,17 +596,17 @@ impl<A: Step> DoubleEndedIterator for ops::Range<A> {
     }
 
     #[inline]
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         if let Some(minus_n) = Step::backward_checked(self.end.clone(), n) {
             if minus_n >= self.start {
                 self.end = minus_n;
-                return n;
+                return Ok(());
             }
         }
 
         let len = Step::steps_between(&self.start, &self.end).unwrap();
         self.end = self.start.clone();
-        len
+        Err(len)
     }
 }
 
@@ -632,9 +632,9 @@ impl<A: Step> Iterator for ops::RangeFrom<A> {
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         self.start = Step::forward(self.start.clone(), n);
-        n
+        Ok(())
     }
 }
 
@@ -677,22 +677,22 @@ impl<A: Step> Iterator for ops::RangeInclusive<A> {
     }
 
     #[inline]
-    fn advance_by(&mut self, n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         if self.is_empty() {
-            return 0;
+            return if n == 0 { Ok(()) } else { Err(0) };
         }
 
         if let Some(plus_n) = Step::forward_checked(self.start.clone(), n) {
             if plus_n <= self.end {
                 self.start = plus_n;
-                return n;
+                return Ok(());
             }
         }
 
         let len = Step::steps_between(&self.start, &self.end).unwrap() + 1;
         self.start = self.end.clone();
         self.exhausted = true;
-        len
+        if len == n { Ok(()) } else { Err(len) }
     }
 
     #[inline]
@@ -773,22 +773,22 @@ impl<A: Step> DoubleEndedIterator for ops::RangeInclusive<A> {
     }
 
     #[inline]
-    fn advance_back_by(&mut self, n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         if self.is_empty() {
-            return 0;
+            return if n == 0 { Ok(()) } else { Err(0) };
         }
 
         if let Some(minus_n) = Step::backward_checked(self.end.clone(), n) {
             if minus_n >= self.start {
                 self.end = minus_n;
-                return n;
+                return Ok(());
             }
         }
 
         let len = Step::steps_between(&self.start, &self.end).unwrap() + 1;
         self.end = self.start.clone();
         self.exhausted = true;
-        len
+        if len == n { Ok(()) } else { Err(len) }
     }
 
     #[inline]

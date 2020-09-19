@@ -24,15 +24,26 @@ impl<A: Iterator, B: Iterator> Zip<A, B> {
     pub(in super::super) fn new(a: A, b: B) -> Zip<A, B> {
         ZipImpl::new(a, b)
     }
-    fn super_nth(&mut self, mut n: usize) -> Option<(A::Item, B::Item)> {
-        while let Some(x) = Iterator::next(self) {
-            if n == 0 {
-                return Some(x);
+
+    fn super_advance_by(&mut self, n: usize) -> Result<(), usize> {
+        for i in 0..n {
+            if Iterator::next(self).is_none() {
+                return Err(i);
             }
-            n -= 1;
         }
-        None
+
+        Ok(())
     }
+
+    // fn super_nth(&mut self, mut n: usize) -> Option<(A::Item, B::Item)> {
+    //     while let Some(x) = Iterator::next(self) {
+    //         if n == 0 {
+    //             return Some(x);
+    //         }
+    //         n -= 1;
+    //     }
+    //     None
+    // }
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -54,9 +65,14 @@ where
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        ZipImpl::nth(self, n)
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        ZipImpl::advance_by(self, n)
     }
+
+    // #[inline]
+    // fn nth(&mut self, n: usize) -> Option<Self::Item> {
+    //     ZipImpl::nth(self, n)
+    // }
 
     #[inline]
     unsafe fn get_unchecked(&mut self, idx: usize) -> Self::Item
@@ -88,7 +104,7 @@ trait ZipImpl<A, B> {
     fn new(a: A, b: B) -> Self;
     fn next(&mut self) -> Option<Self::Item>;
     fn size_hint(&self) -> (usize, Option<usize>);
-    fn nth(&mut self, n: usize) -> Option<Self::Item>;
+    fn advance_by(&mut self, n: usize) -> Result<(), usize>;
     fn next_back(&mut self) -> Option<Self::Item>
     where
         A: DoubleEndedIterator + ExactSizeIterator,
@@ -124,9 +140,14 @@ where
     }
 
     #[inline]
-    default fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.super_nth(n)
+    default fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        self.super_advance_by(n)
     }
+
+    // #[inline]
+    // default fn nth(&mut self, n: usize) -> Option<Self::Item> {
+    //     self.super_nth(n)
+    // }
 
     #[inline]
     default fn next_back(&mut self) -> Option<(A::Item, B::Item)>
@@ -218,12 +239,13 @@ where
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let delta = cmp::min(n, self.len - self.index);
-        let end = self.index + delta;
-        while self.index < end {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        let advance = cmp::min(n, self.len - self.index);
+
+        for _ in 0..advance {
             let i = self.index;
             self.index += 1;
+
             if A::may_have_side_effect() {
                 // SAFETY: the usage of `cmp::min` to calculate `delta`
                 // ensures that `end` is smaller than or equal to `self.len`,
@@ -240,8 +262,34 @@ where
             }
         }
 
-        self.super_nth(n - delta)
+        if advance == n { Ok(()) } else { Err(advance) }
     }
+
+    // #[inline]
+    // fn nth(&mut self, n: usize) -> Option<Self::Item> {
+    //     let delta = cmp::min(n, self.len - self.index);
+    //     let end = self.index + delta;
+    //     while self.index < end {
+    //         let i = self.index;
+    //         self.index += 1;
+    //         if A::may_have_side_effect() {
+    //             // SAFETY: the usage of `cmp::min` to calculate `delta`
+    //             // ensures that `end` is smaller than or equal to `self.len`,
+    //             // so `i` is also smaller than `self.len`.
+    //             unsafe {
+    //                 self.a.get_unchecked(i);
+    //             }
+    //         }
+    //         if B::may_have_side_effect() {
+    //             // SAFETY: same as above.
+    //             unsafe {
+    //                 self.b.get_unchecked(i);
+    //             }
+    //         }
+    //     }
+
+    //     self.super_nth(n - delta)
+    // }
 
     #[inline]
     fn next_back(&mut self) -> Option<(A::Item, B::Item)>

@@ -137,6 +137,23 @@ where
     }
 
     #[inline]
+    fn nth(&mut self, mut n: usize) -> Option<Self::Item> {
+        if let Some(ref mut a) = self.a {
+            match a.advance_by(n) {
+                Ok(()) => match a.next() {
+                    x @ Some(_) => return x,
+                    None => n = 0,
+                },
+                Err(k) => n -= k,
+            }
+
+            self.a = None;
+        }
+
+        maybe!(self.b.nth(n))
+    }
+
+    #[inline]
     fn find<P>(&mut self, mut predicate: P) -> Option<Self::Item>
     where
         P: FnMut(&Self::Item) -> bool,
@@ -218,6 +235,23 @@ where
         }
 
         Err(n - rem)
+    }
+
+    #[inline]
+    fn nth_back(&mut self, mut n: usize) -> Option<Self::Item> {
+        if let Some(ref mut b) = self.b {
+            match b.advance_back_by(n) {
+                Ok(()) => match b.next_back() {
+                    x @ Some(_) => return x,
+                    None => n = 0,
+                },
+                Err(k) => n -= k,
+            }
+
+            self.b = None;
+        }
+
+        maybe!(self.a.nth_back(n))
     }
 
     #[inline]

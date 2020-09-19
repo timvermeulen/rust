@@ -281,7 +281,7 @@ where
         match self.iter {
             Some(ref mut iter) => {
                 let k = iter.advance_by(n);
-                if k > 0 {
+                if k < n {
                     self.iter = None;
                 }
                 k
@@ -368,7 +368,7 @@ where
         match self.iter {
             Some(ref mut iter) => {
                 let k = iter.advance_back_by(n);
-                if k > 0 {
+                if k < n {
                     self.iter = None;
                 }
                 k

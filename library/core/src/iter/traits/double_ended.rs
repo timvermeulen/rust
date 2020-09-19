@@ -94,19 +94,21 @@ pub trait DoubleEndedIterator: Iterator {
     /// needs docs
     #[inline]
     #[unstable(feature = "iter_advance_by", issue = "none")]
-    fn advance_back_by(&mut self, mut n: usize) -> usize {
+    fn advance_back_by(&mut self, n: usize) -> usize {
         if n == 0 {
             return 0;
         }
 
+        let mut k = 0;
+
         for _ in self.rev() {
-            n -= 1;
-            if n == 0 {
+            k += 1;
+            if k == n {
                 break;
             }
         }
 
-        n
+        k
     }
 
     /// Returns the `n`th element from the end of the iterator.
@@ -154,7 +156,7 @@ pub trait DoubleEndedIterator: Iterator {
     #[inline]
     #[stable(feature = "iter_nth_back", since = "1.37.0")]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        if self.advance_back_by(n) == 0 { self.next_back() } else { None }
+        if self.advance_back_by(n) == n { self.next_back() } else { None }
     }
 
     /// This is the reverse version of [`try_fold()`]: it takes elements

@@ -2578,10 +2578,10 @@ impl<'a, T> Iterator for Iter<'a, T> {
         let len = self.len();
         if n >= len {
             self.tail = self.head;
-            n - len
+            len
         } else {
             self.tail = wrap_index(self.tail.wrapping_add(n), self.ring.len());
-            0
+            n
         }
     }
 
@@ -2705,10 +2705,10 @@ impl<'a, T> Iterator for IterMut<'a, T> {
         let len = self.len();
         if n >= len {
             self.tail = self.head;
-            n - len
+            len
         } else {
             self.tail = wrap_index(self.tail.wrapping_add(n), self.ring.len());
-            0
+            n
         }
     }
 

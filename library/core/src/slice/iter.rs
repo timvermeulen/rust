@@ -1158,7 +1158,7 @@ impl<'a, T> Iterator for Windows<'a, T> {
     fn advance_by(&mut self, n: usize) -> usize {
         let advance = cmp::min(self.len(), n);
         self.v = &self.v[advance..];
-        n - advance
+        advance
     }
 
     #[inline]
@@ -1198,7 +1198,7 @@ impl<'a, T> DoubleEndedIterator for Windows<'a, T> {
     fn advance_back_by(&mut self, n: usize) -> usize {
         let advance = cmp::min(self.len(), n);
         self.v = &self.v[..self.v.len() - advance];
-        n - advance
+        advance
     }
 }
 
@@ -1289,7 +1289,7 @@ impl<'a, T> Iterator for Chunks<'a, T> {
         let advance = cmp::min(self.len(), n);
         let i = cmp::min(self.v.len(), advance.saturating_mul(self.chunk_size));
         self.v = &self.v[i..];
-        n - advance
+        advance
     }
 
     #[inline]
@@ -1342,7 +1342,7 @@ impl<'a, T> DoubleEndedIterator for Chunks<'a, T> {
         let rem = len - advance;
         let i = cmp::min(self.v.len(), rem.saturating_mul(self.chunk_size));
         self.v = &self.v[..i];
-        n - advance
+        advance
     }
 }
 
@@ -1427,7 +1427,7 @@ impl<'a, T> Iterator for ChunksMut<'a, T> {
         let i = cmp::min(self.v.len(), advance.saturating_mul(self.chunk_size));
         let (_, tail) = mem::take(&mut self.v).split_at_mut(i);
         self.v = tail;
-        n - advance
+        advance
     }
 
     #[inline]
@@ -1482,7 +1482,7 @@ impl<'a, T> DoubleEndedIterator for ChunksMut<'a, T> {
         let i = cmp::min(self.v.len(), rem.saturating_mul(self.chunk_size));
         let (head, _) = mem::take(&mut self.v).split_at_mut(i);
         self.v = head;
-        n - advance
+        advance
     }
 }
 
@@ -1581,7 +1581,7 @@ impl<'a, T> Iterator for ChunksExact<'a, T> {
         let advance = cmp::min(self.len(), n);
         let i = advance * self.chunk_size;
         self.v = &self.v[i..];
-        n - advance
+        advance
     }
 
     #[inline]
@@ -1615,7 +1615,7 @@ impl<'a, T> DoubleEndedIterator for ChunksExact<'a, T> {
         let advance = cmp::min(self.len(), n);
         let i = self.v.len() - advance * self.chunk_size;
         self.v = &self.v[..i];
-        n - advance
+        advance
     }
 }
 
@@ -1712,7 +1712,7 @@ impl<'a, T> Iterator for ChunksExactMut<'a, T> {
         let i = advance * self.chunk_size;
         let (_, tail) = mem::take(&mut self.v).split_at_mut(i);
         self.v = tail;
-        n - advance
+        advance
     }
 
     #[inline]
@@ -1749,7 +1749,7 @@ impl<'a, T> DoubleEndedIterator for ChunksExactMut<'a, T> {
         let i = self.v.len() - advance * self.chunk_size;
         let (head, _) = mem::take(&mut self.v).split_at_mut(i);
         self.v = head;
-        n - advance
+        advance
     }
 }
 
@@ -2181,7 +2181,7 @@ impl<'a, T> Iterator for RChunks<'a, T> {
         let advance = cmp::min(self.len(), n);
         let i = self.v.len().saturating_sub(advance.saturating_mul(self.chunk_size));
         self.v = &self.v[..i];
-        n - advance
+        advance
     }
 
     #[inline]
@@ -2229,7 +2229,7 @@ impl<'a, T> DoubleEndedIterator for RChunks<'a, T> {
         let rem = len - advance;
         let i = self.v.len().saturating_sub(rem.saturating_mul(self.chunk_size));
         self.v = &self.v[i..];
-        n - advance
+        advance
     }
 }
 
@@ -2315,7 +2315,7 @@ impl<'a, T> Iterator for RChunksMut<'a, T> {
         let i = self.v.len().saturating_sub(advance * self.chunk_size);
         let (head, _) = mem::take(&mut self.v).split_at_mut(i);
         self.v = head;
-        n - advance
+        advance
     }
 
     #[inline]
@@ -2365,7 +2365,7 @@ impl<'a, T> DoubleEndedIterator for RChunksMut<'a, T> {
         let i = self.v.len().saturating_sub(rem.saturating_mul(self.chunk_size));
         let (_, tail) = mem::take(&mut self.v).split_at_mut(i);
         self.v = tail;
-        n - advance
+        advance
     }
 }
 
@@ -2463,7 +2463,7 @@ impl<'a, T> Iterator for RChunksExact<'a, T> {
         let advance = cmp::min(self.len(), n);
         let i = self.v.len() - advance * self.chunk_size;
         self.v = &self.v[..i];
-        n - advance
+        advance
     }
 
     #[inline]
@@ -2501,7 +2501,7 @@ impl<'a, T> DoubleEndedIterator for RChunksExact<'a, T> {
         let rem = len - advance;
         let i = self.v.len() - rem * self.chunk_size;
         self.v = &self.v[i..];
-        n - advance
+        advance
     }
 }
 
@@ -2598,7 +2598,7 @@ impl<'a, T> Iterator for RChunksExactMut<'a, T> {
         let i = self.v.len() - advance * self.chunk_size;
         let (head, _) = mem::take(&mut self.v).split_at_mut(i);
         self.v = head;
-        n - advance
+        advance
     }
 
     #[inline]
@@ -2637,7 +2637,7 @@ impl<'a, T> DoubleEndedIterator for RChunksExactMut<'a, T> {
         let i = self.v.len() - rem * self.chunk_size;
         let (_, tail) = mem::take(&mut self.v).split_at_mut(i);
         self.v = tail;
-        n - advance
+        advance
     }
 }
 

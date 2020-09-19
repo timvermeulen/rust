@@ -167,31 +167,31 @@ macro_rules! iterator {
                 let advance = cmp::min(n, len!(self));
                 // SAFETY: `advance` does not exceed `self.len()`
                 unsafe { self.post_inc_start(advance as isize) };
-                n - advance
+                advance
             }
 
-            #[inline]
-            fn nth(&mut self, n: usize) -> Option<$elem> {
-                if n >= len!(self) {
-                    // This iterator is now empty.
-                    if mem::size_of::<T>() == 0 {
-                        // We have to do it this way as `ptr` may never be 0, but `end`
-                        // could be (due to wrapping).
-                        self.end = self.ptr.as_ptr();
-                    } else {
-                        // SAFETY: end can't be 0 if T isn't ZST because ptr isn't 0 and end >= ptr
-                        unsafe {
-                            self.ptr = NonNull::new_unchecked(self.end as *mut T);
-                        }
-                    }
-                    return None;
-                }
-                // SAFETY: We are in bounds. `post_inc_start` does the right thing even for ZSTs.
-                unsafe {
-                    self.post_inc_start(n as isize);
-                    Some(next_unchecked!(self))
-                }
-            }
+            // #[inline]
+            // fn nth(&mut self, n: usize) -> Option<$elem> {
+            //     if n >= len!(self) {
+            //         // This iterator is now empty.
+            //         if mem::size_of::<T>() == 0 {
+            //             // We have to do it this way as `ptr` may never be 0, but `end`
+            //             // could be (due to wrapping).
+            //             self.end = self.ptr.as_ptr();
+            //         } else {
+            //             // SAFETY: end can't be 0 if T isn't ZST because ptr isn't 0 and end >= ptr
+            //             unsafe {
+            //                 self.ptr = NonNull::new_unchecked(self.end as *mut T);
+            //             }
+            //         }
+            //         return None;
+            //     }
+            //     // SAFETY: We are in bounds. `post_inc_start` does the right thing even for ZSTs.
+            //     unsafe {
+            //         self.post_inc_start(n as isize);
+            //         Some(next_unchecked!(self))
+            //     }
+            // }
 
             #[inline]
             fn last(mut self) -> Option<$elem> {
@@ -371,22 +371,22 @@ macro_rules! iterator {
                 let advance = cmp::min(n, len!(self));
                 // SAFETY: `advance` does not exceed `self.len()`
                 unsafe { self.pre_dec_end(advance as isize) };
-                n - advance
+                advance
             }
 
-            #[inline]
-            fn nth_back(&mut self, n: usize) -> Option<$elem> {
-                if n >= len!(self) {
-                    // This iterator is now empty.
-                    self.end = self.ptr.as_ptr();
-                    return None;
-                }
-                // SAFETY: We are in bounds. `pre_dec_end` does the right thing even for ZSTs.
-                unsafe {
-                    self.pre_dec_end(n as isize);
-                    Some(next_back_unchecked!(self))
-                }
-            }
+            // #[inline]
+            // fn nth_back(&mut self, n: usize) -> Option<$elem> {
+            //     if n >= len!(self) {
+            //         // This iterator is now empty.
+            //         self.end = self.ptr.as_ptr();
+            //         return None;
+            //     }
+            //     // SAFETY: We are in bounds. `pre_dec_end` does the right thing even for ZSTs.
+            //     unsafe {
+            //         self.pre_dec_end(n as isize);
+            //         Some(next_back_unchecked!(self))
+            //     }
+            // }
         }
 
         #[stable(feature = "fused", since = "1.26.0")]

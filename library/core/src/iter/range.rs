@@ -526,13 +526,13 @@ impl<A: Step> Iterator for ops::Range<A> {
         if let Some(plus_n) = Step::forward_checked(self.start.clone(), n) {
             if plus_n <= self.end {
                 self.start = plus_n;
-                return 0;
+                return n;
             }
         }
 
         let len = Step::steps_between(&self.start, &self.end).unwrap();
         self.start = self.end.clone();
-        n - len
+        len
     }
 
     #[inline]
@@ -600,13 +600,13 @@ impl<A: Step> DoubleEndedIterator for ops::Range<A> {
         if let Some(minus_n) = Step::backward_checked(self.end.clone(), n) {
             if minus_n >= self.start {
                 self.end = minus_n;
-                return 0;
+                return n;
             }
         }
 
         let len = Step::steps_between(&self.start, &self.end).unwrap();
         self.end = self.start.clone();
-        n - len
+        len
     }
 }
 
@@ -634,7 +634,7 @@ impl<A: Step> Iterator for ops::RangeFrom<A> {
     #[inline]
     fn advance_by(&mut self, n: usize) -> usize {
         self.start = Step::forward(self.start.clone(), n);
-        0
+        n
     }
 }
 
@@ -679,20 +679,20 @@ impl<A: Step> Iterator for ops::RangeInclusive<A> {
     #[inline]
     fn advance_by(&mut self, n: usize) -> usize {
         if self.is_empty() {
-            return n;
+            return 0;
         }
 
         if let Some(plus_n) = Step::forward_checked(self.start.clone(), n) {
             if plus_n <= self.end {
                 self.start = plus_n;
-                return 0;
+                return n;
             }
         }
 
         let len = Step::steps_between(&self.start, &self.end).unwrap() + 1;
         self.start = self.end.clone();
         self.exhausted = true;
-        n - len
+        len
     }
 
     #[inline]
@@ -775,20 +775,20 @@ impl<A: Step> DoubleEndedIterator for ops::RangeInclusive<A> {
     #[inline]
     fn advance_back_by(&mut self, n: usize) -> usize {
         if self.is_empty() {
-            return n;
+            return 0;
         }
 
         if let Some(minus_n) = Step::backward_checked(self.end.clone(), n) {
             if minus_n >= self.start {
                 self.end = minus_n;
-                return 0;
+                return n;
             }
         }
 
         let len = Step::steps_between(&self.start, &self.end).unwrap() + 1;
         self.end = self.start.clone();
         self.exhausted = true;
-        n - len
+        len
     }
 
     #[inline]

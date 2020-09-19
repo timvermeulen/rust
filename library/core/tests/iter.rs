@@ -469,7 +469,7 @@ fn test_iterator_step_by_nth_overflow() {
         }
         fn advance_by(&mut self, n: usize) -> usize {
             self.0 += n as Bigger;
-            0
+            n
         }
         fn nth(&mut self, n: usize) -> Option<Self::Item> {
             self.0 += n as Bigger + 1;
@@ -2810,6 +2810,7 @@ fn test_chain_try_folds() {
 
     let mut iter = c();
     iter.by_ref().rev().nth(14); // skip the last 15, ending in state Front
+    dbg!(iter.clone().collect::<Vec<_>>());
     assert_eq!(iter.try_fold(7, f), (0..5).try_fold(7, f));
 
     let mut iter = c();

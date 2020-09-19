@@ -116,37 +116,23 @@ where
 
     #[inline]
     fn advance_by(&mut self, n: usize) -> usize {
-        let n = match &mut self.a {
-            Some(a) => a.advance_by(n),
-            None => n,
-        };
+        let mut rem = n;
 
-        if n == 0 {
-            return 0;
+        if let Some(ref mut a) = self.a {
+            rem -= a.advance_by(rem);
+        }
+
+        if rem == 0 {
+            return n;
         } else {
             self.a = None;
         }
 
-        match &mut self.b {
-            Some(b) => b.advance_by(n),
-            None => n,
-        }
-    }
-
-    #[inline]
-    fn nth(&mut self, n: usize) -> Option<A::Item> {
-        let n = match &mut self.a {
-            Some(a) => a.advance_by(n),
-            None => n,
-        };
-
-        if n == 0 {
-            return None;
-        } else {
-            self.a = None;
+        if let Some(ref mut b) = self.b {
+            rem -= b.advance_by(rem);
         }
 
-        maybe!(self.b.nth(n))
+        n - rem
     }
 
     #[inline]
@@ -213,33 +199,23 @@ where
 
     #[inline]
     fn advance_back_by(&mut self, n: usize) -> usize {
-        let n = match &mut self.b {
-            Some(b) => b.advance_back_by(n),
-            None => n,
-        };
+        let mut rem = n;
 
-        if n > 0 {
-            self.b = None;
-        }
-
-        match &mut self.a {
-            Some(a) => a.advance_by(n),
-            None => n,
-        }
-    }
-
-    #[inline]
-    fn nth_back(&mut self, mut n: usize) -> Option<A::Item> {
         if let Some(ref mut b) = self.b {
-            while let Some(x) = b.next_back() {
-                if n == 0 {
-                    return Some(x);
-                }
-                n -= 1;
-            }
+            rem -= b.advance_back_by(rem);
+        }
+
+        if rem == 0 {
+            return n;
+        } else {
             self.b = None;
         }
-        maybe!(self.a.nth_back(n))
+
+        if let Some(ref mut a) = self.a {
+            rem -= a.advance_back_by(rem);
+        }
+
+        n - rem
     }
 
     #[inline]

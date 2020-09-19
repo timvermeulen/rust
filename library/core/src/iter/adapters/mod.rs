@@ -567,22 +567,28 @@ where
     }
 
     #[inline]
-    fn advance_by(&mut self, mut n: usize) -> usize {
-        n = match self.iter.advance_by(n) {
-            0 => return 0,
-            n => n,
-        };
+    fn advance_by(&mut self, n: usize) -> usize {
+        let mut rem = n;
+        rem -= self.iter.advance_by(rem);
+
+        if rem == 0 {
+            return n;
+        }
+
         self.iter = self.orig.clone();
 
-        match self.iter.advance_by(n) {
-            0 => return 0,
-            k if k == n => return n,
-            k => n = k,
-        };
+        match self.iter.advance_by(rem) {
+            0 => return 0, // the cycled iterator is empty
+            k => rem -= k,
+        }
 
-        while n > 0 {
+        if rem == 0 {
+            return n;
+        }
+
+        while rem > 0 {
             self.iter = self.orig.clone();
-            n = self.iter.advance_by(n);
+            rem -= self.iter.advance_by(rem);
         }
 
         0
@@ -688,45 +694,43 @@ where
     }
 
     #[inline]
-    fn advance_by(&mut self, mut n: usize) -> usize {
+    fn advance_by(&mut self, n: usize) -> usize {
         if n == 0 {
             return 0;
         }
 
+        let mut rem = n;
+
         if self.first_take {
             self.first_take = false;
-            if self.iter.next().is_none() {
-                return n;
-            }
-            n -= 1;
 
-            if n == 0 {
+            if self.iter.next().is_none() {
                 return 0;
+            }
+
+            rem -= 1;
+            if rem == 0 {
+                return n;
             }
         }
 
         let step = self.step + 1;
 
-        fn div_rounding_up(a: usize, b: usize) -> usize {
-            a / b + (a % b > 0) as usize
-        }
-
         loop {
-            let product = n.checked_mul(step);
+            let product = rem.checked_mul(step);
 
             if intrinsics::likely(product.is_some()) {
-                let k = self.iter.advance_by(product.unwrap());
-                return div_rounding_up(k, step);
+                let advance = self.iter.advance_by(product.unwrap()) / step;
+                rem -= advance;
+                return n - rem;
             }
 
-            let div_step = usize::MAX / step;
-            let advance = div_step * step;
-            n -= div_step;
+            let number_of_steps = usize::MAX / step;
+            let advance = self.iter.advance_by(number_of_steps * step) / step;
+            rem -= advance;
 
-            let k = self.iter.advance_by(advance);
-
-            if k > 0 {
-                return n + div_rounding_up(k, step);
+            if advance < number_of_steps {
+                return n - rem;
             }
         }
     }
@@ -850,7 +854,7 @@ where
 
         let len = self.len();
         self.nth_back(n - 1);
-        n.saturating_sub(len)
+        cmp::min(n, len)
     }
 
     #[inline]
@@ -1470,14 +1474,12 @@ where
 
     #[inline]
     fn advance_by(&mut self, n: usize) -> usize {
-        match self.iter.advance_by(n) {
-            0 => {
-                // Possible undefined overflow.
-                self.count = Add::add(self.count, n);
-                0
-            }
-            n => n,
+        let advance = self.iter.advance_by(n);
+        if advance == n {
+            // Possible undefined overflow.
+            self.count = Add::add(self.count, n);
         }
+        advance
     }
 
     #[inline]
@@ -1724,13 +1726,13 @@ impl<I: Iterator> Iterator for Peekable<I> {
             return 0;
         }
 
-        let n = match self.peeked.take() {
-            Some(None) => return n,
-            Some(Some(_)) => n - 1,
-            None => n,
+        let peeked = match self.peeked.take() {
+            Some(None) => return 0,
+            Some(Some(_)) => 1,
+            None => 0,
         };
 
-        self.iter.advance_by(n)
+        self.iter.advance_by(n - peeked) + peeked
     }
 
     #[inline]
@@ -1815,13 +1817,14 @@ where
     #[inline]
     fn advance_back_by(&mut self, n: usize) -> usize {
         if let Some(None) = self.peeked {
-            return n;
+            return 0;
         }
 
-        match self.iter.advance_back_by(n) {
-            0 => 0,
-            n => n - self.peeked.take().is_some() as usize,
+        let mut advance = self.iter.advance_back_by(n);
+        if advance < n && self.peeked.take().is_some() {
+            advance += 1;
         }
+        advance
     }
 
     #[inline]
@@ -2390,7 +2393,7 @@ where
 
     #[inline]
     fn advance_by(&mut self, n: usize) -> usize {
-        if self.iter.advance_by(self.n) == 0 { self.iter.advance_by(n) } else { n }
+        if self.iter.advance_by(self.n) == self.n { self.iter.advance_by(n) } else { 0 }
     }
 
     #[inline]
@@ -2487,7 +2490,7 @@ where
     fn advance_back_by(&mut self, n: usize) -> usize {
         let advance = cmp::min(self.len(), n);
         self.iter.advance_back_by(advance);
-        n - advance
+        advance
     }
 
     #[inline]
@@ -2601,14 +2604,9 @@ where
 
     #[inline]
     fn advance_by(&mut self, n: usize) -> usize {
-        if self.n > n {
-            self.n -= n;
-            self.iter.advance_by(n)
-        } else {
-            let take_n = self.n;
-            self.n = 0;
-            n - take_n + self.iter.advance_by(take_n)
-        }
+        let advance = cmp::min(self.n, n);
+        self.n -= advance;
+        self.iter.advance_by(advance)
     }
 
     #[inline]
@@ -2724,7 +2722,7 @@ where
         let excess = iter_len - len;
         let advance = cmp::min(len, n);
         self.iter.advance_back_by(advance + excess);
-        n - advance
+        advance
     }
 
     #[inline]

@@ -2744,7 +2744,14 @@ where
 
     #[inline]
     fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
-        todo!()
+        if n == 0 {
+            // this case needs to be handled separately to ensure it matches
+            // the default implementation, which is a no-op
+            return Ok(());
+        }
+
+        let _ = self.iter.advance_back_by(self.iter.len().saturating_sub(self.n));
+        self.iter.advance_back_by(n)
     }
 
     #[inline]

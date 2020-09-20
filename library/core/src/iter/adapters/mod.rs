@@ -2744,12 +2744,7 @@ where
 
     #[inline]
     fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
-        let iter_len = self.iter.len();
-        let len = cmp::min(iter_len, self.n);
-        let excess = iter_len - len;
-        let advance = cmp::min(len, n);
-        let _ = self.iter.advance_back_by(advance + excess);
-        if advance == n { Ok(()) } else { Err(advance) }
+        todo!()
     }
 
     #[inline]

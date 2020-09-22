@@ -3271,7 +3271,8 @@ impl<T> [T] {
     #[inline]
     #[unstable(feature = "slice_take", issue = "62280")]
     pub fn take_last<'a>(self: &mut &'a Self) -> Option<&'a T> {
-        self.take((self.len() - 1)..).map(|res| &res[0])
+        let i = self.len().checked_sub(1)?;
+        self.take(i..).map(|res| &res[0])
     }
 
     /// Returns a mutable reference to the last element of the slice,
@@ -3294,7 +3295,8 @@ impl<T> [T] {
     #[inline]
     #[unstable(feature = "slice_take", issue = "62280")]
     pub fn take_last_mut<'a>(self: &mut &'a mut Self) -> Option<&'a mut T> {
-        self.take_mut((self.len() - 1)..).map(|res| &mut res[0])
+        let i = self.len().checked_sub(1)?;
+        self.take_mut(i..).map(|res| &mut res[0])
     }
 }
 

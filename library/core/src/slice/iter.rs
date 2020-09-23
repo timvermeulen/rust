@@ -1578,7 +1578,7 @@ impl<'a, T> Iterator for ChunksExact<'a, T> {
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let advance = cmp::min(self.len(), n);
         let i = advance * self.chunk_size;
-        self.v = &self.v[i..];
+        self.v.take(..i);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 
@@ -1612,7 +1612,7 @@ impl<'a, T> DoubleEndedIterator for ChunksExact<'a, T> {
     fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         let advance = cmp::min(self.len(), n);
         let i = self.v.len() - advance * self.chunk_size;
-        self.v = &self.v[..i];
+        self.v.take(i..);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 }
@@ -1708,8 +1708,7 @@ impl<'a, T> Iterator for ChunksExactMut<'a, T> {
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let advance = cmp::min(self.len(), n);
         let i = advance * self.chunk_size;
-        let (_, tail) = mem::take(&mut self.v).split_at_mut(i);
-        self.v = tail;
+        self.v.take_mut(..i);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 
@@ -1745,8 +1744,7 @@ impl<'a, T> DoubleEndedIterator for ChunksExactMut<'a, T> {
     fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         let advance = cmp::min(self.len(), n);
         let i = self.v.len() - advance * self.chunk_size;
-        let (head, _) = mem::take(&mut self.v).split_at_mut(i);
-        self.v = head;
+        self.v.take_mut(i..);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 }
@@ -1826,19 +1824,12 @@ impl<'a, T, const N: usize> Iterator for ArrayWindows<'a, T, N> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        if self.num <= n {
-            self.num = 0;
-            return None;
-        }
-        // SAFETY:
-        // This is safe because it's indexing into a slice guaranteed to be length > N.
-        let ret = unsafe { &*self.slice_head.add(n).cast::<[T; N]>() };
-        // SAFETY: Guaranteed that there are at least n items remaining
-        self.slice_head = unsafe { self.slice_head.add(n + 1) };
-
-        self.num -= n + 1;
-        Some(ret)
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        let advance = cmp::min(self.num, n);
+        // SAFETY: advance <= self.num <= the length of the original slice
+        self.slice_head = unsafe { self.slice_head.add(advance) };
+        self.num -= advance;
+        if advance == n { Ok(()) } else { Err(advance) }
     }
 
     #[inline]
@@ -1861,15 +1852,10 @@ impl<'a, T, const N: usize> DoubleEndedIterator for ArrayWindows<'a, T, N> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<&'a [T; N]> {
-        if self.num <= n {
-            self.num = 0;
-            return None;
-        }
-        // SAFETY: Guaranteed that there are n items remaining, n-1 for 0-indexing.
-        let ret = unsafe { &*self.slice_head.add(self.num - (n + 1)).cast::<[T; N]>() };
-        self.num -= n + 1;
-        Some(ret)
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
+        let advance = cmp::min(self.num, n);
+        self.num -= advance;
+        if advance == n { Ok(()) } else { Err(advance) }
     }
 }
 
@@ -2178,7 +2164,7 @@ impl<'a, T> Iterator for RChunks<'a, T> {
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let advance = cmp::min(self.len(), n);
         let i = self.v.len().saturating_sub(advance.saturating_mul(self.chunk_size));
-        self.v = &self.v[..i];
+        self.v.take(i..);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 
@@ -2226,7 +2212,7 @@ impl<'a, T> DoubleEndedIterator for RChunks<'a, T> {
         let advance = cmp::min(len, n);
         let rem = len - advance;
         let i = self.v.len().saturating_sub(rem.saturating_mul(self.chunk_size));
-        self.v = &self.v[i..];
+        self.v.take(..i);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 }
@@ -2311,8 +2297,7 @@ impl<'a, T> Iterator for RChunksMut<'a, T> {
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let advance = cmp::min(self.len(), n);
         let i = self.v.len().saturating_sub(advance * self.chunk_size);
-        let (head, _) = mem::take(&mut self.v).split_at_mut(i);
-        self.v = head;
+        self.v.take_mut(i..);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 
@@ -2361,8 +2346,7 @@ impl<'a, T> DoubleEndedIterator for RChunksMut<'a, T> {
         let advance = cmp::min(len, n);
         let rem = len - advance;
         let i = self.v.len().saturating_sub(rem.saturating_mul(self.chunk_size));
-        let (_, tail) = mem::take(&mut self.v).split_at_mut(i);
-        self.v = tail;
+        self.v.take_mut(..i);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 }
@@ -2460,7 +2444,7 @@ impl<'a, T> Iterator for RChunksExact<'a, T> {
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let advance = cmp::min(self.len(), n);
         let i = self.v.len() - advance * self.chunk_size;
-        self.v = &self.v[..i];
+        self.v.take(i..);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 
@@ -2473,8 +2457,7 @@ impl<'a, T> Iterator for RChunksExact<'a, T> {
     unsafe fn get_unchecked(&mut self, idx: usize) -> Self::Item {
         let end = self.v.len() - idx * self.chunk_size;
         let start = end - self.chunk_size;
-        // SAFETY:
-        // SAFETY: mostmy identical to `Chunks::get_unchecked`.
+        // SAFETY: mostly identical to `Chunks::get_unchecked`.
         unsafe { from_raw_parts(self.v.as_ptr().add(start), self.chunk_size) }
     }
 }
@@ -2498,7 +2481,7 @@ impl<'a, T> DoubleEndedIterator for RChunksExact<'a, T> {
         let advance = cmp::min(len, n);
         let rem = len - advance;
         let i = self.v.len() - rem * self.chunk_size;
-        self.v = &self.v[i..];
+        self.v.take(..i);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 }
@@ -2594,8 +2577,7 @@ impl<'a, T> Iterator for RChunksExactMut<'a, T> {
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let advance = cmp::min(self.len(), n);
         let i = self.v.len() - advance * self.chunk_size;
-        let (head, _) = mem::take(&mut self.v).split_at_mut(i);
-        self.v = head;
+        self.v.take_mut(i..);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 
@@ -2633,8 +2615,7 @@ impl<'a, T> DoubleEndedIterator for RChunksExactMut<'a, T> {
         let advance = cmp::min(len, n);
         let rem = len - advance;
         let i = self.v.len() - rem * self.chunk_size;
-        let (_, tail) = mem::take(&mut self.v).split_at_mut(i);
-        self.v = tail;
+        self.v.take_mut(..i);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 }

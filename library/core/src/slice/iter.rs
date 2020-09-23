@@ -1288,7 +1288,7 @@ impl<'a, T> Iterator for Chunks<'a, T> {
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let advance = cmp::min(self.len(), n);
         let i = cmp::min(self.v.len(), advance.saturating_mul(self.chunk_size));
-        self.v = &self.v[i..];
+        self.v.take(..i);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 
@@ -1341,7 +1341,7 @@ impl<'a, T> DoubleEndedIterator for Chunks<'a, T> {
         let advance = cmp::min(len, n);
         let rem = len - advance;
         let i = cmp::min(self.v.len(), rem.saturating_mul(self.chunk_size));
-        self.v = &self.v[..i];
+        self.v.take(i..);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 }
@@ -1425,8 +1425,7 @@ impl<'a, T> Iterator for ChunksMut<'a, T> {
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let advance = cmp::min(self.len(), n);
         let i = cmp::min(self.v.len(), advance.saturating_mul(self.chunk_size));
-        let (_, tail) = mem::take(&mut self.v).split_at_mut(i);
-        self.v = tail;
+        self.v.take_mut(..i);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 
@@ -1480,8 +1479,7 @@ impl<'a, T> DoubleEndedIterator for ChunksMut<'a, T> {
         let advance = cmp::min(len, n);
         let rem = len - advance;
         let i = cmp::min(self.v.len(), rem.saturating_mul(self.chunk_size));
-        let (head, _) = mem::take(&mut self.v).split_at_mut(i);
-        self.v = head;
+        self.v.take_mut(i..);
         if advance == n { Ok(()) } else { Err(advance) }
     }
 }

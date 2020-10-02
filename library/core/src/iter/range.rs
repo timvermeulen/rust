@@ -522,17 +522,18 @@ impl<A: Step> Iterator for ops::Range<A> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<A> {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         if let Some(plus_n) = Step::forward_checked(self.start.clone(), n) {
-            if plus_n < self.end {
-                // SAFETY: just checked precondition
-                self.start = unsafe { Step::forward_unchecked(plus_n.clone(), 1) };
-                return Some(plus_n);
+            if plus_n <= self.end {
+                self.start = plus_n;
+                return Ok(());
             }
         }
 
+        // from the above we know that `start + n > end`, so `n > end - start`, so `end - start` cannot overflow `usize`
+        let len = Step::steps_between(&self.start, &self.end).unwrap();
         self.start = self.end.clone();
-        None
+        Err(len)
     }
 
     #[inline]
@@ -596,17 +597,18 @@ impl<A: Step> DoubleEndedIterator for ops::Range<A> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<A> {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         if let Some(minus_n) = Step::backward_checked(self.end.clone(), n) {
-            if minus_n > self.start {
-                // SAFETY: just checked precondition
-                self.end = unsafe { Step::backward_unchecked(minus_n, 1) };
-                return Some(self.end.clone());
+            if minus_n >= self.start {
+                self.end = minus_n;
+                return Ok(());
             }
         }
 
+        // from the above we know that `end - n < start`, so `end - start < n`, so `end - start` cannot overflow `usize`
+        let len = Step::steps_between(&self.start, &self.end).unwrap();
         self.end = self.start.clone();
-        None
+        Err(len)
     }
 }
 
@@ -632,10 +634,9 @@ impl<A: Step> Iterator for ops::RangeFrom<A> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<A> {
-        let plus_n = Step::forward(self.start.clone(), n);
-        self.start = Step::forward(plus_n.clone(), 1);
-        Some(plus_n)
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        self.start = Step::forward(self.start.clone(), n);
+        Ok(())
     }
 }
 
@@ -678,31 +679,23 @@ impl<A: Step> Iterator for ops::RangeInclusive<A> {
     }
 
     #[inline]
-    fn nth(&mut self, n: usize) -> Option<A> {
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         if self.is_empty() {
-            return None;
+            return if n == 0 { Ok(()) } else { Err(0) };
         }
 
         if let Some(plus_n) = Step::forward_checked(self.start.clone(), n) {
-            use crate::cmp::Ordering::*;
-
-            match plus_n.partial_cmp(&self.end) {
-                Some(Less) => {
-                    self.start = Step::forward(plus_n.clone(), 1);
-                    return Some(plus_n);
-                }
-                Some(Equal) => {
-                    self.start = plus_n.clone();
-                    self.exhausted = true;
-                    return Some(plus_n);
-                }
-                _ => {}
+            if plus_n <= self.end {
+                self.start = plus_n;
+                return Ok(());
             }
         }
 
+        // from the above we know that `start + n > end`, so `n > end - start`, so `end - start + 1` cannot overflow `usize`
+        let len = Step::steps_between(&self.start, &self.end).unwrap() + 1;
         self.start = self.end.clone();
         self.exhausted = true;
-        None
+        if len == n { Ok(()) } else { Err(len) }
     }
 
     #[inline]
@@ -783,31 +776,23 @@ impl<A: Step> DoubleEndedIterator for ops::RangeInclusive<A> {
     }
 
     #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<A> {
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         if self.is_empty() {
-            return None;
+            return if n == 0 { Ok(()) } else { Err(0) };
         }
 
         if let Some(minus_n) = Step::backward_checked(self.end.clone(), n) {
-            use crate::cmp::Ordering::*;
-
-            match minus_n.partial_cmp(&self.start) {
-                Some(Greater) => {
-                    self.end = Step::backward(minus_n.clone(), 1);
-                    return Some(minus_n);
-                }
-                Some(Equal) => {
-                    self.end = minus_n.clone();
-                    self.exhausted = true;
-                    return Some(minus_n);
-                }
-                _ => {}
+            if minus_n >= self.start {
+                self.end = minus_n;
+                return Ok(());
             }
         }
 
+        // from the above we know that `end - n < start`, so `end - start < n`, so `end - start + 1` cannot overflow `usize`
+        let len = Step::steps_between(&self.start, &self.end).unwrap() + 1;
         self.end = self.start.clone();
         self.exhausted = true;
-        None
+        if len == n { Ok(()) } else { Err(len) }
     }
 
     #[inline]

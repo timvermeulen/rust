@@ -2315,6 +2315,56 @@ fn test_range_inclusive_exhaustion() {
 }
 
 #[test]
+fn test_range_advance_by() {
+    for i in 0..=5 {
+        let mut range = 10..15;
+        range.advance_by(i).unwrap();
+        assert_eq!(range, 10 + i..15);
+    }
+
+    for i in 6..10 {
+        let mut range = 10..15;
+        assert_eq!(range.advance_by(i), Err(5));
+        assert_eq!(range, 15..15);
+    }
+
+    let mut range = 10..20;
+    range.advance_by(0).unwrap();
+    assert_eq!(range, 10..20);
+    range.advance_by(3).unwrap();
+    assert_eq!(range, 13..20);
+    range.advance_by(3).unwrap();
+    assert_eq!(range, 16..20);
+    assert_eq!(range.advance_by(10), Err(4));
+    assert_eq!(range, 20..20);
+}
+
+#[test]
+fn test_range_advance_back_by() {
+    for i in 0..=5 {
+        let mut range = 10..15;
+        range.advance_back_by(i).unwrap();
+        assert_eq!(range, 10..15 - i);
+    }
+
+    for i in 6..10 {
+        let mut range = 10..15;
+        assert_eq!(range.advance_back_by(i), Err(5));
+        assert_eq!(range, 10..10);
+    }
+
+    let mut range = 10..20;
+    range.advance_back_by(0).unwrap();
+    assert_eq!(range, 10..20);
+    range.advance_back_by(3).unwrap();
+    assert_eq!(range, 10..17);
+    range.advance_back_by(3).unwrap();
+    assert_eq!(range, 10..14);
+    assert_eq!(range.advance_back_by(10), Err(4));
+    assert_eq!(range, 10..10);
+}
+
+#[test]
 fn test_range_nth() {
     assert_eq!((10..15).nth(0), Some(10));
     assert_eq!((10..15).nth(1), Some(11));
@@ -2345,6 +2395,23 @@ fn test_range_nth_back() {
     assert_eq!(r, 10..14);
     assert_eq!(r.nth_back(10), None);
     assert_eq!(r, 10..10);
+}
+
+#[test]
+fn test_range_from_advance_by() {
+    for i in 0..5 {
+        let mut range = 10..;
+        range.advance_by(i).unwrap();
+        assert_eq!(range, 10 + i..);
+    }
+
+    let mut range = 10..;
+    range.advance_by(3).unwrap();
+    assert_eq!(range, 13..);
+    range.advance_by(3).unwrap();
+    assert_eq!(range, 16..);
+    range.advance_by(11).unwrap();
+    assert_eq!(range, 27..);
 }
 
 #[test]
@@ -2383,6 +2450,74 @@ fn test_range_from_take() {
 fn test_range_from_take_collect() {
     let v: Vec<_> = (0..).take(3).collect();
     assert_eq!(v, vec![0, 1, 2]);
+}
+
+#[test]
+fn test_range_inclusive_advance_by() {
+    for i in 0..=5 {
+        let mut range = 10..=15;
+        range.advance_by(i).unwrap();
+        assert_eq!(range, 10 + i..=15);
+    }
+
+    let mut range = 10..=15;
+    range.advance_by(6).unwrap();
+    assert!(range.is_empty());
+
+    for i in 7..10 {
+        let mut range = 10..=15;
+        assert_eq!(range.advance_by(i), Err(6));
+        assert!(range.is_empty());
+    }
+
+    let mut exhausted_via_next = 10_u8..=20;
+    while exhausted_via_next.next().is_some() {}
+
+    let mut range = 10_u8..=20;
+    range.advance_by(3).unwrap();
+    assert_eq!(range, 13..=20);
+    range.advance_by(3).unwrap();
+    assert_eq!(range, 16..=20);
+    assert_eq!(range.is_empty(), false);
+    assert_eq!(ExactSizeIterator::is_empty(&range), false);
+    assert_eq!(range.advance_by(11), Err(5));
+    assert_eq!(range.is_empty(), true);
+    assert_eq!(range, exhausted_via_next);
+    assert_eq!(ExactSizeIterator::is_empty(&range), true);
+}
+
+#[test]
+fn test_range_inclusive_advance_back_by() {
+    for i in 0..=5 {
+        let mut range = 10..=15;
+        range.advance_back_by(i).unwrap();
+        assert_eq!(range, 10..=15 - i);
+    }
+
+    let mut range = 10..=15;
+    range.advance_back_by(6).unwrap();
+    assert!(range.is_empty());
+
+    for i in 7..10 {
+        let mut range = 10..=15;
+        assert_eq!(range.advance_back_by(i), Err(6));
+        assert!(range.is_empty());
+    }
+
+    let mut exhausted_via_next_back = 10_u8..=20;
+    while exhausted_via_next_back.next_back().is_some() {}
+
+    let mut range = 10_u8..=20;
+    range.advance_back_by(3).unwrap();
+    assert_eq!(range, 10..=17);
+    range.advance_back_by(3).unwrap();
+    assert_eq!(range, 10..=14);
+    assert_eq!(range.is_empty(), false);
+    assert_eq!(ExactSizeIterator::is_empty(&range), false);
+    assert_eq!(range.advance_back_by(11), Err(5));
+    assert_eq!(range.is_empty(), true);
+    assert_eq!(range, exhausted_via_next_back);
+    assert_eq!(ExactSizeIterator::is_empty(&range), true);
 }
 
 #[test]

@@ -1442,6 +1442,37 @@ fn test_iterator_flatten() {
     assert_eq!(i, ys.len());
 }
 
+#[test]
+fn test_iterator_flatten_advance_by() {
+    let mut iter = [0, 3, 6].iter().map(|&x| x..x + 3).flatten();
+    assert!(iter.clone().eq(0..9));
+    iter.advance_by(0).unwrap();
+    assert!(iter.clone().eq(0..9));
+    iter.advance_by(2).unwrap();
+    assert!(iter.clone().eq(2..9));
+    iter.advance_back_by(1).unwrap();
+    assert!(iter.clone().eq(2..8));
+    iter.advance_back_by(3).unwrap();
+    assert!(iter.clone().eq(2..5));
+    iter.advance_by(2).unwrap();
+    assert!(iter.clone().eq(4..5));
+    assert_eq!(iter.advance_by(10), Err(1));
+
+    let mut iter = [0, 3, 6].iter().map(|&x| x..x + 3).flatten();
+    assert!(iter.clone().eq(0..9));
+    iter.advance_back_by(0).unwrap();
+    assert!(iter.clone().eq(0..9));
+    iter.advance_back_by(2).unwrap();
+    assert!(iter.clone().eq(0..7));
+    iter.advance_by(1).unwrap();
+    assert!(iter.clone().eq(1..7));
+    iter.advance_by(3).unwrap();
+    assert!(iter.clone().eq(4..7));
+    iter.advance_back_by(2).unwrap();
+    assert!(iter.clone().eq(4..5));
+    assert_eq!(iter.advance_back_by(10), Err(1));
+}
+
 /// Tests `Flatten::fold` with items already picked off the front and back,
 /// to make sure all parts of the `Flatten` are folded correctly.
 #[test]
